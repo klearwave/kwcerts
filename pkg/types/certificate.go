@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"time"
 
@@ -14,6 +15,18 @@ import (
 type certificate struct {
 	CertificateData []byte
 	Request         *x509.Certificate
+}
+
+// CertificateInput represents the input needed to work with certificate objects.
+type CertificateInput struct {
+	Force bool
+
+	KeyBits    int
+	CommonName string
+	ValidDays  int
+
+	CertificateFilePath string
+	KeyFilePath         string
 }
 
 // NewCertificate creates a new instance of a certificate object.
@@ -47,18 +60,36 @@ func (c *certificate) SetRequest(request *x509.Certificate) {
 
 // Generate generates a new certificate from a certificate authority object.
 func (c *certificate) Generate(k *key, ca *certificateAuthority) error {
-	// create the new certificate signed by the CA
-	certBytes, err := x509.CreateCertificate(rand.Reader, c.Request, ca.Certificate.Request, k.PublicKey, ca.Key.PrivateKey)
-	if err != nil {
-		fmt.Printf("Error creating certificate: %v\n", err)
-		return
+	if c.Request == nil {
+		return errors.New("missing request from certificate")
 	}
 
-	// Encode the new certificate to PEM format
-	certPEM := pem.EncodeToMemory(&pem.Block{
+	if ca.Certificate.Request == nil {
+		return errors.New("missing request from ca certificate")
+	}
+
+	// create the new certificate signed by the CA
+	certBytes, err := x509.CreateCertificate(rand.Reader, c.Request, ca.Certificate.Request, &k.PublicKey, ca.Key.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("error creating certificate; %w", err)
+	}
+
+	// encode the new certificate to PEM format
+	c.CertificateData = pem.EncodeToMemory(&pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
+
+	return nil
+}
+
+// Write writes certificate data to a file.
+func (c *certificate) Write(certPath string) error {
+	if len(c.CertificateData) == 0 {
+		return fmt.Errorf("missing certificate data from certificate authority object")
+	}
+
+	return utils.WriteFile(certPath, c.CertificateData)
 }
 
 // Object returns an upstream x509 certificate object from the data stored.

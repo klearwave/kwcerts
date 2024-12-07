@@ -65,6 +65,17 @@ func (k *key) Read(path string) error {
 	return nil
 }
 
+// Write writes key data to a file.
+func (k *key) Write(keyPath string) error {
+	// extract the private key content
+	content, err := k.PrivateKeyBytes()
+	if err != nil {
+		return fmt.Errorf("error extracting private key content; %w", err)
+	}
+
+	return utils.WriteFile(keyPath, content)
+}
+
 // PrivateKeyBytes returns the private key bytes.
 func (k *key) PrivateKeyBytes() ([]byte, error) {
 	// encode the private key in PEM format

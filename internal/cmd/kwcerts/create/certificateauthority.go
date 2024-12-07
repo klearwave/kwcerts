@@ -30,7 +30,7 @@ const (
 
 // newCertificateAuthoritySubCommand creates the 'create ca' subcommand.
 func newCertificateAuthoritySubCommand() *cobra.Command {
-	input := &types.CertificateAuthorityInput{}
+	input := &types.CertificateInput{}
 
 	// create the command object
 	ca := &cobra.Command{
@@ -56,7 +56,7 @@ func newCertificateAuthoritySubCommand() *cobra.Command {
 }
 
 // validateCertificateAuthorityCreate runs the logic to validate inputs.
-func validateCertificateAuthorityCreate(input *types.CertificateAuthorityInput) error {
+func validateCertificateAuthorityCreate(input *types.CertificateInput) error {
 	// validate file inputs
 	for flag, file := range map[string]string{
 		caKeyFileFlag:  input.KeyFilePath,
@@ -103,7 +103,7 @@ func validateCertificateAuthorityCreate(input *types.CertificateAuthorityInput) 
 }
 
 // runCertificateAuthorityCreate runs the logic to runCreate a certificate authority.
-func runCertificateAuthorityCreate(input *types.CertificateAuthorityInput) error {
+func runCertificateAuthorityCreate(input *types.CertificateInput) error {
 	// create a key for the certificate authority
 	key := types.NewKey()
 	if err := key.Generate(types.KeyBits(input.KeyBits)); err != nil {
@@ -112,7 +112,8 @@ func runCertificateAuthorityCreate(input *types.CertificateAuthorityInput) error
 
 	// create the certificate authority object and generate the root
 	ca := types.NewCertificateAuthority(key)
-	if err := ca.GenerateRoot(input); err != nil {
+	ca.SetRequest(input)
+	if err := ca.Certificate.Generate(key, ca); err != nil {
 		return fmt.Errorf("error creating root certificate for certificate authority; %w", err)
 	}
 

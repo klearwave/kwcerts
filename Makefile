@@ -8,3 +8,16 @@ ca: build
 
 ca-read: build
 	@bin/kwcerts read cert --cert-file=tmp/ca.crt
+
+cert:
+	@bin/kwcerts create certificate \
+		--bits=4096 \
+		--days=3650 \
+		--common-name="my-cert" \
+		--ca-key=tmp/ca.key \
+		--ca-cert=tmp/ca.crt \
+		--key=tmp/server.key \
+		--cert=tmp/server.crt
+
+cert-read:
+	@bin/kwcerts read cert --cert-file=tmp/server.crt

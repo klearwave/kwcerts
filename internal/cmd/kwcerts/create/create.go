@@ -15,6 +15,7 @@ func NewSubCommand() *cobra.Command {
 
 	// add the action subcommands
 	create.AddCommand(newCertificateAuthoritySubCommand())
+	create.AddCommand(newCertificateSubCommand())
 
 	return create
 }
