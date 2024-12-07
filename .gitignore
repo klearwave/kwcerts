@@ -1,0 +1,9 @@
+# ignore binary and build files
+bin/
+build/
+
+# ignore completion scripts
+completions/**/*
+
+# ignore local tmp
+tmp/**
