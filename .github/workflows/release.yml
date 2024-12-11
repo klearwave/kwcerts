@@ -4,12 +4,16 @@ on:
   push:
     tags:
       - "*"
+env:
+  IMAGE: "${{ vars.ORG_IMAGE_REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}"
 
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
     permissions:
       contents: "write"
+      actions: "read"
+      security-events: "write"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +36,20 @@ jobs:
           username: ${{ secrets.ORG_IMAGE_REGISTRY_USERNAME }}
           password: ${{ secrets.ORG_IMAGE_REGISTRY_PASSWORD }}
 
+      - name: Build and Load
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: "${{ env.IMAGE }}:${{ github.ref_name }},${{ env.IMAGE }}:latest"
+
+      - name: Scan for Vulnerabilities
+        id: scan
+        uses: crazy-max/ghaction-container-scan@v3
+        with:
+          image: "${{ env.IMAGE }}:latest"
+          dockerfile: ./Dockerfile
+
       - name: Build and Push
         uses: docker/build-push-action@v5
         with:
@@ -39,8 +57,6 @@ jobs:
           platforms: "linux/amd64,linux/arm64"
           push: true
           tags: "${{ env.IMAGE }}:${{ github.ref_name }},${{ env.IMAGE }}:latest"
-        env:
-          IMAGE: "${{ vars.ORG_IMAGE_REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}"
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
