@@ -15,6 +15,7 @@ COPY internal/ internal/
 
 # Build
 RUN CGO_ENABLED=0 go build -a -o kwcerts internal/cmd/kwcerts/kwcerts.go
+RUN chmod +x kwcerts
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -22,7 +23,6 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 USER 65532:65532
 COPY --from=builder /workspace/kwcerts /usr/bin/kwcerts
-RUN chmod +x /usr/bin/kwcerts
 
 ENTRYPOINT ["/usr/bin/kwcerts"]
 CMD ["--help"]
