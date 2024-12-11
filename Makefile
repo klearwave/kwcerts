@@ -2,6 +2,12 @@
 build:
 	@go build -o bin/kwcerts internal/cmd/kwcerts/kwcerts.go
 
+docker-build:
+	@docker build . -t ghcr.io/klearwave/kwcerts:latest
+
+docker-push:
+	@docker push ghcr.io/klearwave/kwcerts:latest
+
 ca: build
 	@mkdir -p tmp
 	@bin/kwcerts create ca --ca-key=tmp/ca.key --ca-cert=tmp/ca.crt --force
