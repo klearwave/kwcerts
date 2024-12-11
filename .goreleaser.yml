@@ -57,7 +57,7 @@ brews:
     repository:
       owner: "klearwave"
       name: "homebrew-tap"
-      token: "{{ .Env.ORG_GITHUB_ACCESS_TOKEN }}"
+      token: "{{ .Env.GITHUB_TOKEN }}"
 
     # Git author used to commit to the repository.
     # Defaults are shown.
