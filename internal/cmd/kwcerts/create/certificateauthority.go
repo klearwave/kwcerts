@@ -44,6 +44,10 @@ func newCertificateAuthoritySubCommand() *cobra.Command {
 	ca.Flags().IntVarP(&input.KeyBits, "bits", "b", int(types.Bits4096), "RSA Bits to use for the certificate authority key")
 	ca.Flags().IntVarP(&input.ValidDays, "days", "d", 3650, "Length in days that the certificate authority is valid for")
 	ca.Flags().StringVarP(&input.CommonName, "common-name", "n", "My Organization", "Common name for the certificate authority")
+	ca.Flags().StringVar(&input.Organization, "organization", "My Organization", "Organization for the certificate authority")
+	ca.Flags().StringVar(&input.Country, "country", "US", "Country for the certificate authority")
+	ca.Flags().StringVar(&input.State, "state", "Nebraska", "State for the certificate authority")
+	ca.Flags().StringVar(&input.City, "city", "Lincoln", "City for the certificate authority")
 	ca.Flags().StringVar(&input.KeyFilePath, caKeyFileFlag, caKeyFileDefault, "Output path to write the certificate authority key file")
 	ca.Flags().StringVar(&input.CertificateFilePath, caCertFileFlag, caCertFileDefault, "Output path to write the certificate authority certificate file")
 	ca.Flags().BoolVar(&input.Force, "force", false, "Force creation of files if existing files exist at --ca-key and --ca-cert paths")
@@ -58,22 +62,23 @@ func newCertificateAuthoritySubCommand() *cobra.Command {
 // validateCertificateAuthorityCreate runs the logic to validate inputs.
 func validateCertificateAuthorityCreate(input *types.CertificateInput) error {
 	// validate file inputs
-	for flag, file := range map[string]string{
+	for flag, flagInput := range map[string]string{
 		caKeyFileFlag:  input.KeyFilePath,
 		caCertFileFlag: input.CertificateFilePath,
+		"common-name":  input.CommonName,
 	} {
 		// return an error if user input an empty value overriding the default
-		if file == "" {
-			return fmt.Errorf("value for flag [%s] is empty", flag)
+		if flagInput == "" {
+			return fmt.Errorf("value for flag [%s] is empty; must not be empty", flag)
 		}
 
 		// if force is not requested, ensure a file does not exist
 		if !input.Force {
-			_, err := os.Stat(file)
+			_, err := os.Stat(flagInput)
 			if err == nil {
 				return fmt.Errorf(
 					"file [%s] exists for flag [%s] and force was not requested",
-					file,
+					flagInput,
 					flag,
 				)
 			}

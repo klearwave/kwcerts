@@ -24,14 +24,10 @@ func NewCertificateAuthority(caKey *key) *certificateAuthority {
 
 // SetRequest sets the request for the certificate authority.
 func (ca *certificateAuthority) SetRequest(input *CertificateInput) {
-	ca.Certificate.SetRequest(&x509.Certificate{
+	request := &x509.Certificate{
 		SerialNumber: big.NewInt(1), // Use a unique serial number for each certificate
 		Subject: pkix.Name{
 			CommonName: input.CommonName,
-			// TODO: we may want this later but just focus on org for name
-			// Country:      []string{"US"},
-			// Province:     []string{"California"},
-			// Locality:     []string{"San Francisco"},
 		},
 		NotBefore:             time.Now(),
 		NotAfter:              time.Now().Add(time.Duration(input.ValidDays) * 24 * time.Hour),
@@ -39,7 +35,11 @@ func (ca *certificateAuthority) SetRequest(input *CertificateInput) {
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		MaxPathLen:            0, // Self-signed CA
-	})
+	}
+
+	input.SetCertificateFields(request)
+
+	ca.Certificate.SetRequest(request)
 }
 
 // WriteKey writes certificate authority key data to a file.

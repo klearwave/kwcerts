@@ -25,5 +25,17 @@ cert:
 		--key=tmp/server.key \
 		--cert=tmp/server.crt
 
+cert-kubernetes:
+	@bin/kwcerts create certificate \
+		--bits=4096 \
+		--days=3650 \
+		--common-name="my-cert" \
+		--ca-key=tmp/ca.key \
+		--ca-cert=tmp/ca.crt \
+		--key=tmp/server.key \
+		--cert=tmp/server.crt \
+		--kubernetes-service-name=test \
+		--kubernetes-service-namespace=default
+
 cert-read:
 	@bin/kwcerts read cert --cert-file=tmp/server.crt

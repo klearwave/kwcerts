@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
@@ -19,11 +20,19 @@ type certificate struct {
 
 // CertificateInput represents the input needed to work with certificate objects.
 type CertificateInput struct {
-	Force bool
+	Force                      bool
+	KubernetesServiceName      string
+	KubernetesServiceNamespace string
 
-	KeyBits    int
-	CommonName string
-	ValidDays  int
+	KeyBits   int
+	ValidDays int
+
+	CommonName              string
+	Organization            string
+	Country                 string
+	State                   string
+	City                    string
+	SubjectAlternativeNames []string
 
 	CertificateFilePath string
 	KeyFilePath         string
@@ -110,6 +119,22 @@ func (c *certificate) Print() error {
 		return fmt.Errorf("error retrieving x509.Certificate object; %w", err)
 	}
 
+	// marshal the public key into DER format
+	publicKey, err := x509.MarshalPKIXPublicKey(object.PublicKey)
+	if err != nil {
+		return fmt.Errorf("error marshal public key; %w", err)
+	}
+
+	// encode the DER bytes into a PEM block
+	var pemBuffer bytes.Buffer
+	err = pem.Encode(&pemBuffer, &pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: publicKey,
+	})
+	if err != nil {
+		return fmt.Errorf("error encoding public key to PEM; %w", err)
+	}
+
 	// output certificate details
 	fmt.Printf("Certificate:\n")
 	fmt.Printf("  Data:\n")
@@ -122,7 +147,8 @@ func (c *certificate) Print() error {
 	fmt.Printf("      Not After : %s\n", object.NotAfter.Format(time.RFC1123))
 	fmt.Printf("    Subject: %s\n", object.Subject)
 	fmt.Printf("    Subject Public Key Algorithm: %s\n", object.PublicKeyAlgorithm)
-	fmt.Printf("    Public Key:\n      %v\n", object.PublicKey)
+	fmt.Printf("    Subject Alternative Names: %v\n", object.DNSNames)
+	fmt.Printf("    Public Key:\n%v\n", pemBuffer.String())
 
 	if len(object.Extensions) > 0 {
 		fmt.Printf("  Extensions:\n")
@@ -132,4 +158,27 @@ func (c *certificate) Print() error {
 	}
 
 	return nil
+}
+
+// SetCertificateFields sets x509 certificate object fields from a CertificateInput object.
+func (input *CertificateInput) SetCertificateFields(cert *x509.Certificate) {
+	if input.Organization != "" {
+		cert.Subject.Organization = []string{input.Organization}
+	}
+
+	if input.Country != "" {
+		cert.Subject.Country = []string{input.Country}
+	}
+
+	if input.State != "" {
+		cert.Subject.Province = []string{input.State}
+	}
+
+	if input.City != "" {
+		cert.Subject.Locality = []string{input.City}
+	}
+
+	if len(input.SubjectAlternativeNames) > 0 {
+		cert.DNSNames = input.SubjectAlternativeNames
+	}
 }

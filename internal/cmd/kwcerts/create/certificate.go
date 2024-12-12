@@ -6,6 +6,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/big"
+	"regexp"
 	"time"
 
 	"github.com/klearwave/kwcerts/pkg/types"
@@ -18,6 +19,11 @@ const certificateExample = `
 # create a new certificate certificate from a local certificate authority
 kwcerts create certifcate --bits=4096 --days=3650 --common-name="My CA" \
   --ca-key=tmp/ca.key --ca-cert=tmp/ca.crt --key=tmp/server.key --cert=tmp/server.crt
+
+# create a kubernetes certificate from a local certificate authority
+kwcerts create certifcate --bits=4096 --days=3650 --common-name="My CA" \
+  --ca-key=tmp/ca.key --ca-cert=tmp/ca.crt --key=tmp/server.key --cert=tmp/server.crt \
+  --kubernetes-service-name=test --kubernetes-service-namespace=default
 `
 
 // below are flag constants that are used multiple times
@@ -38,7 +44,7 @@ func newCertificateSubCommand() *cobra.Command {
 	certInput := &types.CertificateInput{}
 
 	// create the command object
-	ca := &cobra.Command{
+	cert := &cobra.Command{
 		Use:     "certificate",
 		Short:   "Create a new self-signed certificate from a certificate authority",
 		Long:    `Create a new self-signed certificate from a certificate authority`,
@@ -46,34 +52,41 @@ func newCertificateSubCommand() *cobra.Command {
 	}
 
 	// add flags
-	ca.Flags().IntVarP(&certInput.KeyBits, "bits", "b", int(types.Bits4096), "RSA Bits to use for the certificate authority key")
-	ca.Flags().IntVarP(&certInput.ValidDays, "days", "d", 3650, "Length in days that the certificate authority is valid for")
-	ca.Flags().StringVarP(&certInput.CommonName, "common-name", "n", "My Organization", "Common name for the certificate authority")
-	ca.Flags().StringVar(&caInput.KeyFilePath, caKeyFileFlag, caKeyFileDefault, "Path to existing certificate authority key file")
-	ca.Flags().StringVar(&caInput.CertificateFilePath, caCertFileFlag, caCertFileDefault, "Path to existing certificate authority certificate file")
-	ca.Flags().StringVar(&certInput.KeyFilePath, keyFileFlag, keyFileDefault, "Output path to write the certificate key file")
-	ca.Flags().StringVar(&certInput.CertificateFilePath, certFileFlag, certFileDefault, "Output path to write the certificate certificate file")
-	ca.Flags().BoolVar(&certInput.Force, "force", false, "Force creation of files if existing files exist at --ca-key and --ca-cert paths")
+	cert.Flags().IntVarP(&certInput.KeyBits, "bits", "b", int(types.Bits4096), "RSA Bits to use for the certificate key")
+	cert.Flags().IntVarP(&certInput.ValidDays, "days", "d", 3650, "Length in days that the certificate is valid for")
+	cert.Flags().StringVarP(&certInput.CommonName, "common-name", "n", "My Organization", "Common name for the certificate (overwritten if --kubernetes* flags are used)")
+	cert.Flags().StringVar(&certInput.Organization, "organization", "My Organization", "Organization for the certificate")
+	cert.Flags().StringVar(&certInput.Country, "country", "US", "Country for the certificate")
+	cert.Flags().StringVar(&certInput.State, "state", "Nebraska", "State for the certificate")
+	cert.Flags().StringVar(&certInput.City, "city", "Lincoln", "City for the certificate")
+	cert.Flags().StringVar(&caInput.KeyFilePath, caKeyFileFlag, caKeyFileDefault, "Path to existing certificate authority key file")
+	cert.Flags().StringVar(&caInput.CertificateFilePath, caCertFileFlag, caCertFileDefault, "Path to existing certificate authority certificate file")
+	cert.Flags().StringVar(&certInput.KeyFilePath, keyFileFlag, keyFileDefault, "Output path to write the certificate key file")
+	cert.Flags().StringVar(&certInput.CertificateFilePath, certFileFlag, certFileDefault, "Output path to write the certificate certificate file")
+	cert.Flags().StringVar(&certInput.KubernetesServiceName, "kubernetes-service-name", "", "Inject Kubernetes service names into the certificate")
+	cert.Flags().StringVar(&certInput.KubernetesServiceNamespace, "kubernetes-service-namespace", "", "Inject Kubernetes service names into the certificate (used with --kubernetes-service-name)")
+	cert.Flags().BoolVar(&certInput.Force, "force", false, "Force creation of files if existing files exist at --ca-key and --ca-cert paths")
 
 	// set the runtime functions
-	ca.PreRunE = func(_ *cobra.Command, _ []string) error { return validateCertificateCreate(caInput, certInput) }
-	ca.RunE = func(_ *cobra.Command, _ []string) error { return runCertificateCreate(caInput, certInput) }
+	cert.PreRunE = func(_ *cobra.Command, _ []string) error { return validateCertificateCreate(caInput, certInput) }
+	cert.RunE = func(_ *cobra.Command, _ []string) error { return runCertificateCreate(caInput, certInput) }
 
-	return ca
+	return cert
 }
 
 // validateCertificateCreate runs the logic to validate inputs.
 func validateCertificateCreate(caInput, certInput *types.CertificateInput) error {
 	// validate file inputs
-	for flag, file := range map[string]string{
+	for flag, flagInput := range map[string]string{
 		caKeyFileFlag:  caInput.KeyFilePath,
 		caCertFileFlag: caInput.CertificateFilePath,
 		keyFileFlag:    certInput.KeyFilePath,
 		certFileFlag:   certInput.CertificateFilePath,
+		"common-name":  certInput.CommonName,
 	} {
 		// return an error if user input an empty value overriding the default
-		if file == "" {
-			return fmt.Errorf("value for flag [%s] is empty", flag)
+		if flagInput == "" {
+			return fmt.Errorf("value for flag [%s] is empty; must not be empty", flag)
 		}
 	}
 
@@ -94,6 +107,20 @@ func validateCertificateCreate(caInput, certInput *types.CertificateInput) error
 	// validate common name.  according to rfc 5280, the max length for a common name is 64
 	if len(certInput.CommonName) > 64 {
 		return fmt.Errorf("invalid common name length [%d]; max is 64 according to rfc 5280", len(certInput.CommonName))
+	}
+
+	// if kubernetes is used, be sure we have a kubernetes conformant name
+	kubernetesRegEx := regexp.MustCompile(`^[a-z0-9-]+$`)
+	if certInput.KubernetesServiceName != "" {
+		if !kubernetesRegEx.MatchString(certInput.KubernetesServiceName) {
+			return fmt.Errorf("kubernetes-service-name must only contain lowercase alphanumeric characters and dashes")
+		}
+	}
+
+	if certInput.KubernetesServiceNamespace != "" {
+		if !kubernetesRegEx.MatchString(certInput.KubernetesServiceNamespace) {
+			return fmt.Errorf("kubernetes-service-namespace must only contain lowercase alphanumeric characters and dashes")
+		}
 	}
 
 	return nil
@@ -136,6 +163,18 @@ func runCertificateCreate(caInput, certInput *types.CertificateInput) error {
 		return fmt.Errorf("error generating serial number; %w", err)
 	}
 
+	if certInput.KubernetesServiceName != "" {
+		certInput.CommonName = certInput.KubernetesServiceName
+
+		certInput.SubjectAlternativeNames = []string{
+			certInput.CommonName,
+			fmt.Sprintf("%s.%s", certInput.CommonName, certInput.KubernetesServiceNamespace),
+			fmt.Sprintf("%s.%s.svc", certInput.CommonName, certInput.KubernetesServiceNamespace),
+			fmt.Sprintf("%s.%s.svc.cluster.local", certInput.CommonName, certInput.KubernetesServiceNamespace),
+			"localhost",
+		}
+	}
+
 	certRequest := &x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
@@ -147,6 +186,8 @@ func runCertificateCreate(caInput, certInput *types.CertificateInput) error {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
+
+	certInput.SetCertificateFields(certRequest)
 
 	// generate the certificate from the certificate authority
 	cert := types.NewCertificate()
