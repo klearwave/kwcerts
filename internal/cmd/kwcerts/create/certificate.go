@@ -16,11 +16,11 @@ import (
 // certificateExample is the example text that is displayed by the CLI to
 // assist the user with usage.
 const certificateExample = `
-# create a new certificate certificate from a local certificate authority
+# create a new self-signed certificate from a local certificate authority
 kwcerts create certifcate --bits=4096 --days=3650 --common-name="My CA" \
   --ca-key=tmp/ca.key --ca-cert=tmp/ca.crt --key=tmp/server.key --cert=tmp/server.crt
 
-# create a kubernetes certificate from a local certificate authority
+# create a new self-signed kubernetes certificate from a local certificate authority
 kwcerts create certifcate --bits=4096 --days=3650 --common-name="My CA" \
   --ca-key=tmp/ca.key --ca-cert=tmp/ca.crt --key=tmp/server.key --cert=tmp/server.crt \
   --kubernetes-service-name=test --kubernetes-service-namespace=default
