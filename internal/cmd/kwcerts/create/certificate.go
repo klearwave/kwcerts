@@ -55,6 +55,7 @@ func newCertificateSubCommand() *cobra.Command {
 	cert.Flags().IntVarP(&certInput.KeyBits, "bits", "b", int(types.Bits4096), "RSA Bits to use for the certificate key")
 	cert.Flags().IntVarP(&certInput.ValidDays, "days", "d", 3650, "Length in days that the certificate is valid for")
 	cert.Flags().StringVarP(&certInput.CommonName, "common-name", "n", "My Organization", "Common name for the certificate (overwritten if --kubernetes* flags are used)")
+	cert.Flags().StringArrayVar(&certInput.SubjectAlternativeNames, "subject-alt-names", []string{}, "DNS names to add to the certificate")
 	cert.Flags().StringVar(&certInput.Organization, "organization", "My Organization", "Organization for the certificate")
 	cert.Flags().StringVar(&certInput.Country, "country", "US", "Country for the certificate")
 	cert.Flags().StringVar(&certInput.State, "state", "Nebraska", "State for the certificate")
@@ -87,6 +88,13 @@ func validateCertificateCreate(caInput, certInput *types.CertificateInput) error
 		// return an error if user input an empty value overriding the default
 		if flagInput == "" {
 			return fmt.Errorf("value for flag [%s] is empty; must not be empty", flag)
+		}
+	}
+
+	// validate subject alternative names to ensure they are valid DNS names
+	for _, san := range certInput.SubjectAlternativeNames {
+		if !isValidDNSName(san) {
+			return fmt.Errorf("invalid subject alternative name [%s]; must be a valid DNS name", san)
 		}
 	}
 
@@ -166,12 +174,18 @@ func runCertificateCreate(caInput, certInput *types.CertificateInput) error {
 	if certInput.KubernetesServiceName != "" {
 		certInput.CommonName = certInput.KubernetesServiceName
 
-		certInput.SubjectAlternativeNames = []string{
+		kubernetesSubjectAlternativeNames := []string{
 			certInput.CommonName,
 			fmt.Sprintf("%s.%s", certInput.CommonName, certInput.KubernetesServiceNamespace),
 			fmt.Sprintf("%s.%s.svc", certInput.CommonName, certInput.KubernetesServiceNamespace),
 			fmt.Sprintf("%s.%s.svc.cluster.local", certInput.CommonName, certInput.KubernetesServiceNamespace),
 			"localhost",
+		}
+
+		if len(certInput.SubjectAlternativeNames) == 0 {
+			certInput.SubjectAlternativeNames = kubernetesSubjectAlternativeNames
+		} else {
+			certInput.SubjectAlternativeNames = append(certInput.SubjectAlternativeNames, kubernetesSubjectAlternativeNames...)
 		}
 	}
 
@@ -220,4 +234,16 @@ func generateSerialNumber() (*big.Int, error) {
 
 	serialNumber := new(big.Int).SetBytes(serialNumberBytes)
 	return serialNumber, nil
+}
+
+// isValidDNSName validates if a given string is a valid DNS hostname.
+func isValidDNSName(hostname string) bool {
+	// Regular expression for validating DNS hostnames
+	dnsRegex := `^(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)\.)*(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)$`
+
+	// Compile the regex
+	re := regexp.MustCompile(dnsRegex)
+
+	// Check if the hostname matches the regex and is within the valid length
+	return re.MatchString(hostname) && len(hostname) <= 253
 }
