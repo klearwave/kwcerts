@@ -15,7 +15,7 @@ builds:
     main: "./internal/cmd/kwcerts"
     binary: "kwcerts"
     ldflags:
-      - "-s -w -X github.com/klearwave/internal/cmd/kwcerts/version.version={{ .Version }} -extldflags '-static'"
+      - "-s -w -X github.com/klearwave/kwcerts/internal/cmd/kwcerts/version.version={{ .Version }} -extldflags '-static'"
 
 archives:
   - name_template: >-
