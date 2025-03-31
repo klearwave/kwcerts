@@ -24,6 +24,10 @@ kwcerts create certifcate --bits=4096 --days=3650 --common-name="My CA" \
 kwcerts create certifcate --bits=4096 --days=3650 --common-name="My CA" \
   --ca-key=tmp/ca.key --ca-cert=tmp/ca.crt --key=tmp/server.key --cert=tmp/server.crt \
   --kubernetes-service-name=test --kubernetes-service-namespace=default
+
+# create a new self-signed certificate using subject alternative names and using default
+# ./ca.key and ./ca.crt files for the certificate authority
+kwcerts create certifcate --subject-alt-name="test.example.com" --subject-alt-name="test2.example.com"
 `
 
 // below are flag constants that are used multiple times
@@ -55,7 +59,7 @@ func newCertificateSubCommand() *cobra.Command {
 	cert.Flags().IntVarP(&certInput.KeyBits, "bits", "b", int(types.Bits4096), "RSA Bits to use for the certificate key")
 	cert.Flags().IntVarP(&certInput.ValidDays, "days", "d", 3650, "Length in days that the certificate is valid for")
 	cert.Flags().StringVarP(&certInput.CommonName, "common-name", "n", "My Organization", "Common name for the certificate (overwritten if --kubernetes* flags are used)")
-	cert.Flags().StringArrayVar(&certInput.SubjectAlternativeNames, "subject-alt-names", []string{}, "DNS names to add to the certificate")
+	cert.Flags().StringArrayVar(&certInput.SubjectAlternativeNames, "subject-alt-name", []string{}, "DNS names to add to the certificate")
 	cert.Flags().StringVar(&certInput.Organization, "organization", "My Organization", "Organization for the certificate")
 	cert.Flags().StringVar(&certInput.Country, "country", "US", "Country for the certificate")
 	cert.Flags().StringVar(&certInput.State, "state", "Nebraska", "State for the certificate")
